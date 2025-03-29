@@ -1,0 +1,7 @@
+flask
+langchain-ollama
+langchain-core
+langchain-community
+scikit-learn
+numpy
+ollama
