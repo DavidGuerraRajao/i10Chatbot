@@ -1,4 +1,3 @@
-from jinja2 import TemplateNotFound 
 from flask import Flask, render_template, request, jsonify
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
@@ -6,10 +5,8 @@ from langchain_ollama.llms import OllamaLLM
 from langchain_community.vectorstores import FAISS
 import re
 import os
-print("Current working directory:", os.getcwd())
-print("Template folder exists?", os.path.exists(os.path.join(os.getcwd(), 'templates')))
 
-app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'templates'))
+app = Flask(__name__)
 
 # Initialize the models and templates
 model = OllamaLLM(model="deepseek-r1:32b")
@@ -110,15 +107,7 @@ def get_faq_response(question):
 
 @app.route('/')
 def home():
-    try:
-        return render_template('index.html')
-    except TemplateNotFound as e:  # Add 'as e' here
-        print(f"Template error: {str(e)}")
-        print("Templates directory contents:", os.listdir('templates'))
-        return "Template not found - contact support", 404
-    except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        return "An error occurred", 500
+    return render_template('index.html')
 
 
 @app.route('/ask', methods=['POST'])
@@ -150,7 +139,6 @@ def ask():
 
 
 # Add this right before if __name__ == '__main__':
-application = app
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    app.run(debug=True)
