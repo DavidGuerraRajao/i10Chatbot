@@ -5,8 +5,10 @@ from langchain_ollama.llms import OllamaLLM
 from langchain_community.vectorstores import FAISS
 import re
 import os
+print("Current working directory:", os.getcwd())
+print("Template folder exists?", os.path.exists(os.path.join(os.getcwd(), 'templates')))
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 
 # Initialize the models and templates
 model = OllamaLLM(model="deepseek-r1:32b")
