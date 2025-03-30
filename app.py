@@ -109,7 +109,11 @@ def get_faq_response(question):
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except TemplateNotFound:
+        print("Templates directory contents:", os.listdir('templates'))
+        raise
 
 
 @app.route('/ask', methods=['POST'])
