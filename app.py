@@ -1,3 +1,4 @@
+from jinja2 import TemplateNotFound 
 from flask import Flask, render_template, request, jsonify
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
@@ -111,9 +112,13 @@ def get_faq_response(question):
 def home():
     try:
         return render_template('index.html')
-    except TemplateNotFound:
+    except TemplateNotFound as e:  # Add 'as e' here
+        print(f"Template error: {str(e)}")
         print("Templates directory contents:", os.listdir('templates'))
-        raise
+        return "Template not found - contact support", 404
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return "An error occurred", 500
 
 
 @app.route('/ask', methods=['POST'])
