@@ -5,3 +5,4 @@ langchain-community
 scikit-learn
 numpy
 ollama
+gunicorn==23.0.0
