@@ -1,0 +1,1 @@
+Para rodar o codigo entre em algum IDE e coloque isto no terminal git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY
