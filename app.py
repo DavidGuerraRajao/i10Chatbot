@@ -8,7 +8,7 @@ import os
 print("Current working directory:", os.getcwd())
 print("Template folder exists?", os.path.exists(os.path.join(os.getcwd(), 'templates')))
 
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'templates'))
 
 # Initialize the models and templates
 model = OllamaLLM(model="deepseek-r1:32b")
