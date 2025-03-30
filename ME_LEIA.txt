@@ -1,1 +1,11 @@
-Para rodar o codigo entre em algum IDE e coloque isto no terminal git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY
+Para rodar o chatbot primeiro voce tera que instalar Ollama(https://ollama.com/download) em sua maquina.
+Depois rode este comando no terminal do seu computador ou no terminal do IDE e escrava este comando ollama run deepseek-r1.
+Com isto voce tera instalado o DeepSeek R1 que eu usei para fazer o meu chatbot.
+
+Agora entre em algum IDE e coloque isto no terminal do seu ambiente virtual 
+git clone https://github.com/DavidGuerraRajao/i10Chatbot.git
+com isso voce ira automaticamente copiar todo o meu codigo.
+
+Apos isso em seu ambiente virtual que voce copiou rodar este comando 
+pip install -r requirements.txt 
+assim instalara todas as bibliotecas nessesarias para rodar o meu codigo.
