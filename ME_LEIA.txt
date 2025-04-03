@@ -1,5 +1,5 @@
 ALERTA! Voce tera que ter uma GPU ou um Servidor com no minimo rodavel de 16GB de Vram
-e no minimo do minimo 8GB de Vram.
+e no minimo do minimo 8GB de Vram. Se nao ira durar uma eternidade
 
 Para rodar o chatbot primeiro voce tera que instalar Ollama(https://ollama.com/download) em sua maquina.
 Depois rode este comando no terminal do seu computador ou no terminal do IDE e escrava este comando ollama run deepseek-r1.
@@ -12,3 +12,7 @@ com isso voce ira automaticamente copiar todo o meu codigo.
 Apos isso em seu ambiente virtual que voce copiou rodar este comando 
 pip install -r requirements.txt 
 assim instalara todas as bibliotecas nessesarias para rodar o meu codigo.
+
+Para finalmente rodar o codigo coloque isto no terminal:
+ollama serve
+Depois presse play no app.py
