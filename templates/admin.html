@@ -109,9 +109,7 @@
             <label for="faqEntry">Formato:</label>
             <textarea id="formatExample" readonly>Pergunta: Sua pergunta aqui?
 
-Resposta: Sua resposta aqui.
-//</textarea>
-
+Resposta: Sua resposta aqui.</textarea>
         </div>
         <div class="form-group">
             <label for="faqEntry">Nova FAQ:</label>
@@ -131,21 +129,7 @@ Resposta: Sua resposta aqui.
         <h2>FAQs Existentes</h2>
         <button onclick="loadFAQs()">Recarregar FAQs</button>
         <div id="faqList" class="faq-list"></div>
-        <!-- Add this section before the closing </div> in admin.html -->
-<h2>Remover Conteúdo</h2>
-
-<div class="form-group">
-    <h3>Remover FAQ</h3>
-    <div id="faqList" class="faq-list"></div>
-</div>
-
-<div class="form-group">
-    <h3>Remover Documentos</h3>
-    <label>Texto para Remover (documentos contendo este texto serão apagados):</label>
-    <textarea id="textToRemove" placeholder="Digite o texto exato que deseja remover dos documentos"></textarea>
-    <button onclick="deleteDocuments()">Remover Documentos</button>
-    <div id="deleteDocMessage" class="message" style="display: none;"></div>
-</div>
+    </div>
 
     <script>
         function addFAQ() {
