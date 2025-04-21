@@ -1,10 +1,15 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama.llms import OllamaLLM
 from langchain_community.vectorstores import FAISS
 import re
 import os
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 app = Flask(__name__)
 
@@ -45,14 +50,16 @@ Mas se voce ter que criar uma resposta mais longa fassa.
 Responda aqui:
 """
 
+# File paths
+FAQ_FILE = "fileij"
+DB_DIRECTORY = "db_directory"
+
 
 def retrieve_docs(db, query, k=10):
-    # Returns list of (Document, score) tuples
     return db.similarity_search_with_score(query, k)
 
 
 def question_pdf(question, documents):
-    # Extract text from each document (ignoring scores)
     document_texts = [doc[0].page_content for doc in documents]
     context = "\n\n\n".join(document_texts)
     prompt = ChatPromptTemplate.from_template(main_template)
@@ -62,25 +69,27 @@ def question_pdf(question, documents):
 
 
 def load_faq_documents():
-    # Load FAQ documents (you'll need to implement this based on your file structure)
-    # This should return a list of documents similar to your model2.py implementation
-    content = fileij
-    return [line.strip() for line in content.split('//')]
+    if os.path.exists(FAQ_FILE):
+        with open(FAQ_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return [line.strip() for line in content.split('//') if line.strip()]
+    return []
+
 
 def get_faq_response(question):
-    # Implement the FAQ response logic from model2.py
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.metrics.pairwise import cosine_similarity
-    import numpy as np
+    dirty_docs = load_faq_documents()
 
     def cleaner():
-        content = fileij
+        with open(FAQ_FILE, 'r', encoding='utf-8') as file:
+            content = file.read()
         pattern = r'Pergunta:\s*(.*?\?)'
         perguntas = re.findall(pattern, content)
         return [pergunta.strip() for pergunta in perguntas]
 
-    dirty_docs = load_faq_documents()
     cleaned_docs = cleaner()
+    if not cleaned_docs:
+        return "Desculpe, não há perguntas frequentes disponíveis no momento."
+
     vectorizer = TfidfVectorizer().fit(cleaned_docs)
     doc_vectors = vectorizer.transform(cleaned_docs)
     query_vector = vectorizer.transform([question])
@@ -104,7 +113,7 @@ def get_faq_response(question):
 
 @app.route('/')
 def home():
-    return render_template('index.html')  # Looks in templates/ directory
+    return render_template('index.html')
 
 
 @app.route('/ask', methods=['POST'])
@@ -113,17 +122,15 @@ def ask():
     use_faq = request.form.get('use_faq', 'true') == 'true'
 
     if use_faq:
-        # First try with FAQ
         response = get_faq_response(question)
         return jsonify({
             'response': response,
             'method': 'FAQ'
         })
     else:
-        # Fall back to document search
-        embeddings = OllamaEmbeddings(model="deepseek-r1:32b")
+        embeddings = OllamaEmbeddings(model="qwq:32b")
         db = FAISS.load_local(
-            "/Users/david/PycharmProjects/i10Chatbot/.venv/db_directory",
+            DB_DIRECTORY,
             embeddings,
             allow_dangerous_deserialization=True
         )
@@ -134,449 +141,80 @@ def ask():
             'method': 'Document Search'
         })
 
-fileij = """
-                                                               Pergunta: Como devo fazer para cadastrar um tipo de deficiência?
-
-Resposta:
-1-Logar no sistema i10 bibliotecas.
-2-Selecionar Administração
-3-Selecionar o terceiro ícone da esquerda para direita( amarelo claro) Gestão de pessoas
-4-Clicar no segundo item da gride  Tipo de Deficiência
-
-	Iniciando o cadastro de deficiência:
-O sistema i10 bibliotecas já disponibiliza uma lista de tipo de deficiências que são descritos pela lei (LBI), também conhecida como Estatuto da Pessoa com Deficiência, Lei nº 13.146, de 6 de julho de 2015.
-Mas se você deseja especificar mais os tipos de deficiência lei proceda da seguinte maneira.
-	Iniciando o cadastro de deficiência:
-O sistema i10 bibliotecas já disponibiliza uma lista de tipo de deficiências que são descritos pela lei (LBI), também conhecida como Estatuto da Pessoa com Deficiência, Lei nº 13.146, de 6 de julho de 2015.
-Mas se você deseja especificar mais os tipos de deficiência lei proceda da seguinte maneira.
-
-//
-Pergunta: Como faço para cadastrar um tipo de deficiência autodeclarada?
-
-Resposta:
-O primeira ação você deve fazer uma busca para verificar se a deficiência autodeclarda já não existe na base de dados.
-Caso não exista você deve clicar no botão novo
-Preencher o Campo
-Clique em salvar
-O cadastro já esta pronto .
-//
-Pergunta: Pode me explicar o que é Deficiência Autodeclarada?
-
-Resposta:
-A autodeclaração de deficiência é um processo em que a própria pessoa se identifica como tendo uma deficiência ou mais de uma deficiência. Essa autodeclaração é importante para garantir o acesso a direitos e benefícios específicos e para melhor atender os usuários facilitando assim a inclusão e melhorando a qualidade dos serviços disponibilizados.
-//
-Pergunta: No Brasil como é entendida a deficiência?
-
-Resposta:
-A lei brasileira que versa sobre a inclusão da pessoa com deficiência é a Lei Brasileira de Inclusão da Pessoa com Deficiência (LBI), também conhecida como Estatuto da Pessoa com Deficiência, Lei nº 13.146, de 6 de julho de 2015.
-"aquela  pessoa que tem impedimento de longo prazo de natureza física, mental, intelectual ou sensorial, o qual, em interação com uma ou mais barreiras, pode obstruir sua participação plena e efetiva na sociedade em igualdade de condições com as demais pessoas." 1. pt.wikipedia.org
-//
-Pergunta: Quais são as deficiências auto declaradas qualificadas no Brasil?
-
-Resposta:
-•          Deficiência física:
-            Abrange dificuldades de mobilidade, como paraplegia, tetraplegia, amputações, paralisia cerebral, entre outras.
-•          Deficiência auditiva:
-           Inclui surdez total ou parcial, em diferentes graus.
-•         Deficiência visual:
-            Abrange cegueira total ou parcial, baixa visão e outras condições que afetam a visão.
-•         Deficiência intelectual:
-           Envolve limitações no funcionamento intelectual e adaptativo, como dificuldades de aprendizado, raciocínio e resolução de problemas.
-•         Deficiência múltipla:
-           É a combinação de duas ou mais deficiências.
-           Deficiência psicossocial:
-           Abrange condições de saúde mental, como transtorno bipolar, esquizofrenia, depressão grave, entre outros.
-//
-Pergunta: Qual a importância de espaços para autodeclaração de deficiências no sistema de gestão de bibliotecas?
-
-Resposta:
-A inclusão de espaços para autodeclaração de deficiência no sistema i10 bibliotecas foi pensado visando atender melhor aos seus usuários, oferecer melhor qualidade de seus serviços, participar efetivamente nos processos de inclusão e  estar em sintonia com a legislação vigente.
-
-Promoção da Inclusão e Acessibilidade:
-•	Identificação de Necessidades:
-•	A autodeclaração permite que as bibliotecas identifiquem e compreendam melhor as necessidades específicas de seus usuários com deficiência.
-•	Adaptação de Serviços:
-•	Com essas informações, as bibliotecas podem adaptar seus serviços, coleções e espaços físicos para garantir a acessibilidade e a inclusão de todos.
-•	Criação de Ambientes Acolhedores:
-•	Ao reconhecer e respeitar a autodeclaração, as bibliotecas demonstram seu compromisso com a inclusão, criando ambientes mais acolhedores e respeitosos.
-//
-Pergunta: Quais sao as Garantia de Direitos e Benefícios da deficiencia autodeclarada?
-
-Resposta:
-•	Acesso a Recursos Específicos:
-•	A autodeclaração pode facilitar o acesso a recursos e serviços específicos, como materiais em formatos acessíveis, tecnologias assistivas e atendimento especializado.
-•	Respeito à Autonomia:
-•	A autodeclaração permite que as pessoas com deficiência exerçam sua autonomia e autodeterminação, decidindo como e quando divulgar sua condição.
-//
-Pergunta: Como voces melhorao o sistema de ajuda ao usuario com deficienciancias?
-
-Resposta:
-•	Dados Estatísticos: A coleta de dados sobre a autodeclaração de deficiência permite que as bibliotecas e os órgãos gestores obtenham informações estatísticas importantes para o planejamento e a avaliação de políticas e programas de inclusão.
-•	Melhoria de Serviços: Esses dados podem ser utilizados para identificar áreas de melhoria e desenvolver estratégias mais eficazes para atender às necessidades dos usuários com deficiência.
-//
-Pergunta: Qual eh a Legislação e Normas Brasileiras sobre usuarios com deciencias?
-
-Resposta:
-•	Cumprimento da Lei: A inclusão de espaços para autodeclaração de deficiência está alinhada com a legislação e as normas que garantem os direitos das pessoas com deficiência.
-•	Promoção da Igualdade: Ao garantir a igualdade de acesso e oportunidades, as bibliotecas contribuem para a construção de uma sociedade mais justa e inclusiva.
-//
-Pergunta: O que é o campo 505 no Marc 21?
-
-Resposta:
-O campo 505 é referente a uma nota de conteúdo padronizada.
-Utilizado para informar os títulos de uma coletânea, partes do documento, podendo também incluir indicação de responsabilidade associada aos documentos ou as partes, volume, número e outras designações de seqüência, não incluindo número de capítulos. Pode-se incluir dados que pertencem a outras notas ou áreas da descrição, em alguns materiais, por exemplo, número de páginas, de partes ou de fotogramas de cada parte.
-//
-Pergunta: Onde devo cadastrar o campo 505 do Marc 21 no i10 bibliotecas?
-
-Resposta:
-	O Campo 505 do Marc21 que se refere a notas de conteúdos pode ser encontrado no i10 bibliotecas no módulo de cadastro de item (exemplar).
-	É a quarta aba após a funcionalidade de Capítulos.
-//
-Pergunta: Como faço para incluir o campo 505 do Marc21 de um material já existente na base de dados no i10 Bibliotecas
-
-Resposta:
-	Logue no sistema i10 bibliotecas
-	Selecione administração
-	Selecione o módulo de processamento técnico
-	Selecione a opção Cadastro de Título
-	Faça uma pesquisa pelo termo livre  título da Obra
-	Ao encontrar a obra na parte inferior do  quadrante que se refere a obra clique na primeira imagem .
-	Aparecerá a listagem de exemplar
-	Selecione a exemplar que deve conter as nota
-	Clique no exemplar que você deseja incluir os dados do campo MARC 21 notas conteúdos.
-	Clique na gride a mesma ficará azul
-	Clique em editar
-	Desça o mouse até a quarta aba NOTAS E CAPÍTULOS
-	Preencha o campo com os dados referente
-	Clique em salvar.
-//
-Pergunta: Como faço para incluir o campo 505 do Marc21 em vários exemplares de uma mesma obra no i10 Bibliotecas?
-
-Resposta:
-	Logue no sistema i10 bibliotecas
-
-	Selecione administração
-
-	Selecione o módulo de processamento técnico
-
-	Selecione a opção Cadastro de Título
-
-	Faça uma pesquisa pelo termo livre Título da Obra
-
-	Ao encontrar a obra na parte inferior do  quadrante que se refere a obra clique na primeira imagem .
-
-	Aparecerá a listagem de exemplar
-
-	Clique no primeiro quadrado ao lado do ID , ele ficara da cor cor e todos os exemplares selecionados 	ficaram da cor laranja.
-
-	Selecione o botão EDIÇÃO EM MASSA
-
-	Desça o mouse até a quarta aba NOTAS E CAPÍTULOS
-
-	Preencha o campo com os dados referente A NOTAS E REFERÊNCIAS
-
-	Clique em salvar.
-
-//
-Pergunta: Por que ter um módulo de Gestão de pessoas; cadastro de usuários no software i10 bibliotecas?
-
-Resposta:
-Ter um módulo de Gestão de pessoas (cadastro de usuários); no software i10bibliotecas foi fundamental por diversas razões, podemos citar a otimização tanto da gestão da biblioteca quanto as experiências dos usuários.
-//
-Pergunta: Quais as vantagens de se ter um módulo de gestão de pessoas?
-
-Resposta:
-Controles de acessos e empréstimos:
-•	Identificação:
-•	Permite identificar cada usuário de forma única, facilitando o controle de empréstimos, devoluções e reservas.
-•	Restrições:
-•	Possibilita definir regras de acesso e empréstimo personalizadas para diferentes categorias de usuários (alunos, professores, visitantes, etc.).
-•	Histórico:
-•	Mantém um histórico de empréstimos e atividades de cada usuário, auxiliando na gestão de inadimplência e na análise de padrões de uso.
-            Personalização e Comunicação:
-•	Preferências:
-•	Permite coletar informações sobre os interesses e preferências dos usuários, possibilitando a oferta de recomendações personalizadas.
-•	Comunicação:
-•	Facilita o envio de notificações sobre prazos de devolução, novas aquisições e eventos da biblioteca.
-•	Atendimento:
-•	Agiliza o atendimento ao usuário, pois o bibliotecário tem acesso rápido às informações do usuário.
-            Estatísticas e Relatórios:
-•	Perfil dos usuários:
-•	Permite gerar relatórios sobre o perfil dos usuários, auxiliando na tomada de decisões sobre aquisição de acervo e oferta de serviços.
-•	Uso da biblioteca:
-•	Fornece dados sobre a frequência de uso da biblioteca, os tipos de materiais mais procurados e outros indicadores relevantes.
-•	Avaliação:
-•	Auxilia na avaliação da eficácia dos serviços da biblioteca e na identificação de áreas que precisam de melhorias.
-            Segurança e Organização:
-•	Responsabilidade:
-•	Atribui responsabilidade aos usuários pelos materiais emprestados, reduzindo o risco de perdas e danos.
-•	Organização:
-•	Facilita a organização do acervo e a localização de materiais, agilizando o atendimento aos usuários.
-•	Segurança:
-•	Permite restringir o acesso a determinados materiais ou áreas da biblioteca a usuários autorizados.
-//
-Pergunta: Quero cadastrar um novo usuário como devo proceder?
-
-Resposta:
-Existem 3 (Três) formas de cadastrar um usuário ou mais usuários no i10 bibliotecas
-1-Cadastro via Webservice
-2 Cadastro via planilha de excell
-3-Cadastro unitário ( um a um por usuário)
-31.  Logar no sistema i10 bibliotecas
-3.2  Selecionar administração da biblioteca
-3.3  Selecionar o terceiro ícone da esquerda para direita( amarelo claro) Gestão de pessoas
-3.4   Clicar
-3.5   Selecionar cadastro de usuário
-3.6   Campo Biblioteca de Origem – Selecione o SIM
-3.7  Campo Pesquisa  Selecione Nome de Registro
-3.8  Campo Ativo . Selecione Todos
-3.9  Instituição  Selecione a Instiotuição
-3.10 Selecione da Biblioteca
-3.11 Nome de Registro  para  Faça uma busca pelo nome do usuário nome e sobrenome completo
-3.8  Caso não exista mesmo um usuário com este nome comece o cadastro de um novo usuário
-3.9  Campo Categoria do usuário: Selecione a Categoria * Este é um  campo Obrigatório. Lembre-se que as categorias são preenchidas no módulo de políticas e elas definem a classificação dos usuários dentro do i10bibliotecas bem como seus acessos, seus poderes, suas obrigações
-3.10. Campo Usuário Titular: Preencha este campo com o nome completo do titular.  Devemos ressaltar que este campo deve ser preenchido de acordo com a política de empréstimos e de dependentes da Instituição.
-//
-Pergunta: Como eu me cadastro no i10 do zero?
-
-Resposta:
-Opção de resposta 1 Resposta:
-Se você é um aluno da Instituição a qual a biblioteca pertence, basta ir ao balcão de atendimento da biblioteca se identificar para o operador da biblioteca e ele vai reverificar se você já está cadastrado automaticamente.  Se você não estiver cadastrado ele fará o cadastro na hora conforme política da Instituição.
-
-Opção de Resposta 2
-Se você deseja se cadastrar em uma biblioteca que você ainda não é um usuário frequente dirija-se ao balcão de atendimento com seu documento de identidade que o agente operador da biblioteca terá prazer em te cadastrar, mas se você for menor de 16 anos deverá estar acompanhando por um adulto.  Seu cadastro ficará pronto em minutos.
-
-Opção de resposta Reposta 3
-Se a Instituição que você já faz parte tem em sua política de gestão a permissão que o leitor faça o seu auto cadastro basta clicar abaixo do Campo Senha Auto Cadastro o i10 apresentara um formulário para você preencher. A confirmação do aceite do seu auto cadastro se dará de forma rápida e é feita por e-mail.
-//
-Pergunta: Como eu posso pesquisar um livro um livro especifico i10?
-
-Resposta:
-É muito fácil pesquisar no i10 bibliotecas, ele tem uma espaço específico para você pesquisar muito e se divertir ainda mais.
-Preencha os Campos:   Usuário e senha.
-Na parte superior ao lado a logo da sua Instituição e nome da Biblioteca digite a informação que você tem da obra Título, autor, editora, Parte da obra.
-Mas se por esta busca você não encontrar o que precisa clique em Busca avançada ai você poderá encontrar muitas combinações para você achar o que precisa.
-Ao encontrar seu material, curta, indique, reserve, conte para todos mundo que você vai lê este material.
-//
-Pergunta: É possível conversar com pessoas com interesses parecidos com o meu. Se sim, como posso acessar esta funcionalidade?
-
-Resposta:
-Sim no espaço da Rede Social do Conhecimento você encontrar pessoas que tem interesses semelhantes aos seus.
-Tudo começa assim, Consulte uma Obra do seu interesse.
-Ao sistema retornar uma ou mais possibilidades.  clique na obra, ali abrirá um mundo de possibilidades para você interagir
-Número de pessoas que já viram este material:  Se você clicar em visualizar você poderá vê quem são estas pessoas, clique. Escolha quem você deseja como amigo e mande um pedido de amizade. Simples assim, espere um pouco e você receberá a resposta confirmando sua solicitação e assim começará uma amizade literária.
-Número dos que querem ver este material:
-Listas com este item
-Fóruns com este item
-Itens semelhantes tipo assim quem leu isso também leu aquilo.
-Resenhas
-Veja a Time Line de todo mundo e então convide para ser seu amigo.
-Com certeza você fará muitas amizades literárias.
-//
-Pergunta: Tem como eu ler um livro na plataforma do i10 de graça?
-
-Resposta:
-Sim claro que Sim, e existem 3 formas de você viver esta experiência
-Todos os livros que forem de domínio público e que estiverem disponíveis através da biblioteca a qual você pertence você pode lê-los à vontade.
-Todos os livros e materiais que estiverem disponibilizados no RI (Repositório Institucional da sua Biblioteca) você também pode lê-los à vontade.
-Todos os livros eletrônicos que foram adquiridos e disponibilizados pela sua biblioteca. Neste caso eles seguiram a política então da Instituição, você pode se inteirar dela com o seu operador de biblioteca.
-//
-Pergunta: Como conseguir um empréstimo de um livro?
-
-Resposta:
-Basta você estar cadastrado como usuário daquela biblioteca, dirija-se a biblioteca, escolha o material que lhe interessa e se dirija ao operador da bibliotecas informe o seu nome, se o material não estiver reservado em segundos seu empréstimo estará realizado.
-//
-Pergunta: Como eu poderia devolver um livro no i10?
-
-Resposta:
-É muito fácil devolver um livro basta você se dirigir ao balcão de atendimento e entregar o material ao operador da biblioteca em segundos os livro estará devolvido. Mas fique sempre alerta aos combinados de prazos de devoluções.
-//
-Pergunta: Como fazer upload de um livro para o i10?
-
-Resposta:
-Quando um livro é digitalizado e tem permissão para se baixado por upload, você verá um botão escrito “visualizar” e outro botão escrito “download”. Clique no botão “donwload” e o conteúdo do livro baixará no seu computador, smartfone ou tablet.
-//
-Pergunta: Tem como eu ficar com um dos livros do i10 para mim e só para mim?
-
-Resposta:
-Isso não é uma coisa muito legal de se fazer, lembra-se que esta parte está fora dos combinados, que você sabe desde pequeno, mas vou lembra-lo que conhecimento tem que circular, mas você pode ir até o operador da biblioteca e tentar algumas coisas legais e possíveis.
-1-	Explicar o seu grande interesse e o operador da biblioteca, caso não tenha lista de reservas para esta obra poderá renovar seu material por um tempo maior.
-2-	Se na biblioteca tiver muitos exemplares deste material você poderá tentar fazer uma permuta com alguma outra obra que seja tão relevante quanto está para a biblioteca.
-3-	O Importante é você ir ter com o Operador da biblioteca e tenho certeza que você sairá de lá bem feliz com o acordo que vocês fizerem.
-//
-Pergunta: Meu filho tem 9 anos ele pode ficar na plataforma do i10 sem supervisão?
-
-Resposta:
-Estou entendendo que você deseja saber se o espaço da Rede Social do Conhecimento é seguro para o seu filho de 9 anos navegar sozinho, a resposta é SIM, sendo o seu filho um interagente da Rede Social do Conhecimento ele já é um leitor em formação, mas já passou pelo círculo de aprendizagem de base, onde os pequenos leitores já sabem dos combinados do que se pode fazer ou não fazer dentro de uma Rede Social do Conhecimento.
-//
-Pergunta: O que significa no i10 no cadastro de Usuários o termo Ativo e Inativo?
-
-Resposta:
-Em uma biblioteca, a definição de usuário ativo e inativo está relacionada à frequência de uso dos serviços oferecidos pela biblioteca. Essa classificação é importante para a gestão da biblioteca, permitindo identificar o público que efetivamente utiliza seus recursos e direcionar ações para atrair aqueles que estão inativos.
-
-Usuário ativo:
-
-É aquele que utiliza os serviços da biblioteca com frequência, como empréstimo reservas, renovações, acesso a recursos online, participação em eventos, entre outros.
-
-A definição de "frequência" pode variar de acordo com a política da biblioteca, mas geralmente envolve um número mínimo de utilizações dentro de um determinado período de tempo.
-
-Usuário inativo:
-
-É aquele que não utiliza os serviços da biblioteca há um período prolongado ou seja não estão emprestando, consultando, reservando, renovando os livros ou materiais em geral, sejam porque não fazem parte mais da instituição ou por não se sentirem motivados a ir a biblioteca.
-
-Assim como a definição de usuário ativo, o tempo que define a inatividade também varia, mas geralmente é de alguns meses ou anos.
-
-A inatividade pode ser causada por diversos fatores, como falta de interesse, mudança de hábitos, dificuldade de acesso, entre outros.
-//
-Pergunta: Em que a classificação de usuários em ativos e inativos auxiliam na gestão da biblioteca?
-
-Resposta:
-•	A identificação de usuários ativos e inativos permite que a biblioteca avalie a eficácia de seus serviços e identifique áreas que precisam de melhoria.
-
-•	Com base nessa classificação, a biblioteca pode desenvolver estratégias para atrair usuários inativos, como a promoção de eventos, a oferta de novos recursos e a divulgação de serviços.
-
-•	Além disso, a classificação auxilia na gestão do acervo, permitindo identificar os livros e outros materiais que são mais utilizados e direcionar a aquisição de novos itens.
-
-Funcionalidade: Basta você clicar no círculo da palavra Inativo ou Ativo escolhendo SIM ou NÃO.
-//
-Pergunta: Quando um usuário é inativado?
-
-Resposta:
-Quando saem da instituição e perdem o direito de usar a biblioteca ai eles são inativados.
-//
-Pergunta: Por que os usuários não são deletados e sim inativados?
-
-Resposta:
-Todo usuário que tenham pelo menos uma movimentação na biblioteca ele não pode ser excluído pois este empréstimo conta nos indicadores da circulação.
-Se nós o deletarmos automaticamente os relatórios de circulação de materiais perderiam a consistência pois daria diferença entre os números da época e os números no momento atual.
-//
-Pergunta: O que é categoria de usuários?
-
-Resposta:
-A categoria de usuários é uma classificação que define o nível de acesso e as permissões de cada usuário que utiliza o sistema tem. Essa categorização é essencial para garantir a segurança, a organização e a eficiência da biblioteca.
-//
-Pergunta: Quais os principais objetivos das categorias de usuários?
-
-Resposta:
-Controle de acesso:  Defini quais são as funcionalidades do sistema que cada grupo usuário pode acessar. Ex. como cadastro de livros, empréstimos, relatórios, etc.
-
-Permissões diferenciadas: Atribui diferentes níveis de permissão para cada categoria, como leitura, edição, exclusão de dados, etc.
-
-Organização e segurança: Garante que apenas pessoas autorizadas tenham acesso a informações sensíveis e possam realizar determinadas ações no sistema.
-//
-Pergunta: Quais são os exemplos de categorias de usuários?
-
-Resposta:
-Administrador: Possui acesso total ao sistema, podendo realizar todas as operações, como cadastro de livros, gerenciamento de usuários, geração de relatórios, etc.
-
-Bibliotecário: Possui acesso às principais funcionalidades do sistema, como Parâmetros, Processamento Técnico, Administração, Políticas, Gestão de Pessoas, Circulação etc.
-
-Usuário comum: Possui acesso limitado ao sistema, podendo realizar apenas operações básicas, como consulta de materiais em geral, reservas
-//
-Pergunta: Por que a categoria de usuários é importante?
-
-Resposta:
-A definição das categorias de usuários e suas respectivas permissões é uma etapa fundamental na implantação de um software de gestão de bibliotecas. É importante que a biblioteca analise suas necessidades e defina as categorias de usuários de forma clara e precisa, garantindo assim a segurança, a organização e a eficiência do sistema.
-//
-Pergunta: O que significa o campo Matrícula?
-
-Resposta:
-No sistema i10 bibliotecas o campo "matrícula" é um identificador único atribuído a cada usuário cadastrado. Ele é um Campo alfa numérico e pode ser criado através de um controle da biblioteca ou também pode ser um número de identificação do usuário na Instituição como um todo. O importante é que ele seja:
-
-Uma identificação individual:
-A matrícula permite que a biblioteca identifique cada usuário de forma precisa, evitando confusões com nomes semelhantes.
-
-Um controle de acesso:
-A matrícula é utilizada para controlar o acesso aos serviços da biblioteca, como empréstimo de materiais, reservas, cesso a recursos online e participação em eventos.
-
-Registro de atividades:
-A matrícula é utilizada para registrar as atividades de cada usuário, como empréstimos, devoluções, reservas e histórico de leitura.
-
-Geração de relatórios:
-A matrícula é utilizada para gerar relatórios sobre o uso da biblioteca, como número de empréstimos por usuário, materiais mais populares e perfil dos usuários.
-
-Em resumo, o campo matrícula é uma ferramenta fundamental para a gestão de bibliotecas, permitindo organizar e controlar o acesso aos serviços, registrar as atividades dos usuários e gerar informações úteis para a tomada de decisões.
-//
-Pergunta: O que é um usuário titular no i10 bibliotecas?
-
-Resposta:
-No sistema i10 bibliotecas, o termo "usuário titular" geralmente se refere ao indivíduo que possui o cadastro principal na biblioteca, com direitos e responsabilidades específicos. Essa definição pode variar ligeiramente dependendo das políticas de cada instituição, mas geralmente engloba os seguintes aspectos:
-
-Principais características de um usuário titular:
-
-Cadastro principal:
-É o usuário que possui o registro primário na biblioteca, com seus dados pessoais e informações de contato.
-
-Responsabilidade pelo cadastro:
-O usuário titular é responsável por manter seus dados atualizados e por quaisquer materiais emprestados em seu nome.
-
-Direitos e privilégios:
-O titular geralmente tem acesso a todos os serviços da biblioteca, como empréstimo, acesso a recursos online e participação em eventos.
-
-Responsabilidade por dependentes:
-Em alguns casos, o usuário titular pode ser responsável por cadastrar e gerenciar dependentes, como filhos ou outros membros da família.
-
-Diferenças em relação a outros tipos de usuários:
-
-Usuários dependentes:
-São aqueles cadastrados sob a responsabilidade de um usuário titular, com acesso limitado a alguns serviços.
-
-Usuários eventuais ou visitantes:
-São aqueles que utilizam a biblioteca de forma esporádica, sem um cadastro completo, e com acesso restrito a alguns recursos.
-
-Em resumo, o usuário titular é o membro principal da biblioteca, com direitos e responsabilidades plenos, e é quem detém o cadastro primário dentro do sistema da  biblioteca.
-//
-Pergunta: O que define um nome social?
-
-Resposta:
-O termo "nome social" refere-se ao nome pelo qual pessoas transgênero, travestis e outras pessoas que não se identificam com o nome de registro civil preferem ser chamadas. É uma forma de reconhecimento e respeito à identidade de gênero de cada indivíduo.
-
-Principais aspectos do nome social:
-•	Identidade de gênero: O nome social está diretamente ligado à identidade de gênero, que é a forma como uma pessoa se identifica e se expressa, independentemente do sexo biológico atribuído ao nascimento.
-•	Respeito e reconhecimento: Utilizar o nome social de uma pessoa é uma forma de demonstrar respeito e reconhecimento à sua identidade de gênero, promovendo um ambiente mais inclusivo e acolhedor.
-•	Direito: O uso do nome social é um direito garantido por lei em diversos países, incluindo o Brasil.
-•	Inclusão: O uso do nome social é uma forma de inclusão social, pois permite que pessoas transgênero e travestis se sintam mais confortáveis e seguras em diversos ambientes, como escolas, universidades, empresas e serviços públicos.
-//
-Pergunta: Qual a importância do nome social?
-
-Resposta:
-•	O nome social é fundamental para a construção da identidade e autoestima de pessoas transgênero e travestis.
-•	O uso do nome social contribui para a redução do preconceito e da discriminação.
-•	O reconhecimento do nome social é um passo importante para a garantia dos direitos e da cidadania de pessoas transgênero e travestis.
-•	Em resumo, o nome social é uma ferramenta importante para a promoção da igualdade e do respeito à diversidade de gênero.
-//
-Pergunta: Qual a importância de se cadastrar o e-mail dos usuários dentro do sistema i10 Bibliotecas?
-
-Resposta:
-O cadastro de e-mail dos usuários dentro do i10 bibliotecas é de extrema importância para a comunicação e o relacionamento entre a instituição e seu público no i10 bibliotecas os e-mails permitem.
-
-Comunicação eficiente:
-
-•	Notificações: envio de lembretes sobre prazos de devolução, renovações, reservas e outras informações importantes.
-•	Divulgação de eventos e atividades: informar os usuários sobre palestras, workshops, clubes de leitura e outras atividades promovidas pela biblioteca.
-•	Atualizações: enviar newsletters com novidades sobre o acervo, serviços e recursos da biblioteca.
-•	Comunicação individualizada: enviar mensagens personalizadas para cada usuário, de acordo com seus interesses e necessidades.
-
-Otimização de serviços:
-
-•	Pesquisas de satisfação: coletar feedback dos usuários sobre os serviços oferecidos pela biblioteca, para identificar pontos de melhoria.
-•	Divulgação de recursos online: informar os usuários sobre a disponibilidade de e-books, bases de dados, periódicos eletrônicos e outros recursos digitais.
-•	Promoção de novos serviços: divulgar novos serviços e recursos oferecidos pela biblioteca, como empréstimo de tablets, acesso a softwares e cursos online.
-
-Fortalecimento do relacionamento:
-
-•	Criação de comunidade: promover a interação entre os usuários e a biblioteca, através de grupos de discussão online e outras atividades.
-•	Personalização da experiência: oferecer serviços e recursos personalizados para cada usuário, de acordo com seus interesses e necessidades.
-•	Construção de um canal de comunicação direto: manter um canal de comunicação aberto e eficiente com os usuários, para responder a suas dúvidas e sugestões.
-
-Sustentabilidade e economia:
-
-A comunicação feita por e-mail, reduz o uso de papel, sendo mais sustentável.
-Diminui custos com ligações telefônicas e envio de correspondências.
-Em resumo, o cadastro de e-mail dos usuários é uma ferramenta fundamental para a gestão de bibliotecas, permitindo otimizar a comunicação, melhorar os serviços e fortalecer o relacionamento com o público.
-//
-"""
-# Add this right before if __name__ == '__main__':
+
+# Admin routes
+@app.route('/admin')
+def admin():
+    return render_template('admin.html')
+
+
+@app.route('/admin/add_faq', methods=['POST'])
+def add_faq():
+    new_entry = request.form['faq_entry']
+
+    # Validate the format
+    if "Pergunta:" not in new_entry or "Resposta:" not in new_entry:
+        return jsonify({"success": False, "message": "Formato inválido. Use 'Pergunta: ... Resposta: ...'"})
+
+    # Add to FAQ file
+    with open(FAQ_FILE, 'a', encoding='utf-8') as f:
+        f.write(f"\n{new_entry}\n//")
+
+    return jsonify({"success": True, "message": "FAQ adicionada com sucesso!"})
+
+
+@app.route('/admin/add_document', methods=['POST'])
+def add_document():
+    new_doc = request.form['document_text']
+
+    # Create document
+    documents = [Document(page_content=new_doc)]
+
+    # Split text
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200
+    )
+    splits = text_splitter.split_documents(documents)
+
+    # Initialize embeddings
+    embeddings = OllamaEmbeddings(model="deepseek-r1:32b")
+
+    try:
+        # Try to load existing DB
+        db = FAISS.load_local(
+            DB_DIRECTORY,
+            embeddings,
+            allow_dangerous_deserialization=True
+        )
+        # Add new documents to existing DB
+        db.add_documents(splits)
+    except:
+        # If DB doesn't exist, create new
+        db = FAISS.from_documents(splits, embeddings)
+
+    # Save the updated DB
+    db.save_local(DB_DIRECTORY)
+
+    return jsonify({"success": True, "message": "Documento adicionado ao banco de dados com sucesso!"})
+
+print('Para a interface de administradores: http://localhost:5000/admin')
+print('Para a interface de usuarios: http://127.0.0.1:5000')
+
+@app.route('/admin/view_faqs')
+def view_faqs():
+    if os.path.exists(FAQ_FILE):
+        with open(FAQ_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        faqs = [faq.strip() for faq in content.split('//') if faq.strip()]
+        return jsonify({"faqs": faqs})
+    return jsonify({"faqs": []})
+
 
 if __name__ == '__main__':
+    # Create necessary files if they don't exist
+    if not os.path.exists(FAQ_FILE):
+        with open(FAQ_FILE, 'w', encoding='utf-8') as f:
+            f.write("")
+
     app.run(debug=True)
