@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Chatbot i10 Bibliotecas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .admin-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            min-height: 150px;
+            font-family: Arial, sans-serif;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .faq-list {
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        .faq-item {
+            background-color: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        .nav {
+            display: flex;
+            margin-bottom: 20px;
+            background-color: #2c3e50;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .nav a {
+            color: white;
+            padding: 15px 20px;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            background-color: #34495e;
+        }
+        .nav a.active {
+            background-color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/">Chatbot</a>
+        <a href="/admin" class="active">Admin</a>
+    </div>
+
+    <div class="admin-container">
+        <h1>Área Administrativa</h1>
+
+        <h2>Adicionar Nova FAQ</h2>
+        <div class="form-group">
+            <label for="faqEntry">Formato:</label>
+            <textarea id="formatExample" readonly>Pergunta: Sua pergunta aqui?
+
+Resposta: Sua resposta aqui.
+//</textarea>
+
+        </div>
+        <div class="form-group">
+            <label for="faqEntry">Nova FAQ:</label>
+            <textarea id="faqEntry" placeholder="Cole o texto da nova FAQ no formato acima"></textarea>
+        </div>
+        <button onclick="addFAQ()">Adicionar FAQ</button>
+        <div id="faqMessage" class="message" style="display: none;"></div>
+
+        <h2>Adicionar Novo Documento</h2>
+        <div class="form-group">
+            <label for="documentText">Texto do Documento:</label>
+            <textarea id="documentText" placeholder="Cole o texto do novo documento aqui"></textarea>
+        </div>
+        <button onclick="addDocument()">Adicionar Documento</button>
+        <div id="docMessage" class="message" style="display: none;"></div>
+
+        <h2>FAQs Existentes</h2>
+        <button onclick="loadFAQs()">Recarregar FAQs</button>
+        <div id="faqList" class="faq-list"></div>
+        <!-- Add this section before the closing </div> in admin.html -->
+<h2>Remover Conteúdo</h2>
+
+<div class="form-group">
+    <h3>Remover FAQ</h3>
+    <div id="faqList" class="faq-list"></div>
+</div>
+
+<div class="form-group">
+    <h3>Remover Documentos</h3>
+    <label>Texto para Remover (documentos contendo este texto serão apagados):</label>
+    <textarea id="textToRemove" placeholder="Digite o texto exato que deseja remover dos documentos"></textarea>
+    <button onclick="deleteDocuments()">Remover Documentos</button>
+    <div id="deleteDocMessage" class="message" style="display: none;"></div>
+</div>
+
+    <script>
+        function addFAQ() {
+            const faqEntry = document.getElementById('faqEntry').value.trim();
+            if (!faqEntry) {
+                showMessage('faqMessage', 'Por favor, insira o texto da FAQ.', 'error');
+                return;
+            }
+
+            fetch('/admin/add_faq', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `faq_entry=${encodeURIComponent(faqEntry)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('faqMessage', data.message, 'success');
+                    document.getElementById('faqEntry').value = '';
+                    loadFAQs();
+                } else {
+                    showMessage('faqMessage', data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('faqMessage', 'Erro ao adicionar FAQ: ' + error, 'error');
+            });
+        }
+
+        function addDocument() {
+            const docText = document.getElementById('documentText').value.trim();
+            if (!docText) {
+                showMessage('docMessage', 'Por favor, insira o texto do documento.', 'error');
+                return;
+            }
+
+            fetch('/admin/add_document', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `document_text=${encodeURIComponent(docText)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('docMessage', data.message, 'success');
+                    document.getElementById('documentText').value = '';
+                } else {
+                    showMessage('docMessage', data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('docMessage', 'Erro ao adicionar documento: ' + error, 'error');
+            });
+        }
+
+        function loadFAQs() {
+            fetch('/admin/view_faqs')
+            .then(response => response.json())
+            .then(data => {
+                const faqList = document.getElementById('faqList');
+                faqList.innerHTML = '';
+
+                if (data.faqs.length === 0) {
+                    faqList.innerHTML = '<p>Nenhuma FAQ encontrada.</p>';
+                    return;
+                }
+
+                data.faqs.forEach(faq => {
+                    const faqItem = document.createElement('div');
+                    faqItem.className = 'faq-item';
+                    faqItem.innerHTML = `<pre>${faq}</pre>`;
+                    faqList.appendChild(faqItem);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading FAQs:', error);
+            });
+        }
+
+        function showMessage(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `message ${type}`;
+            element.style.display = 'block';
+
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 5000);
+        }
+
+        // Load FAQs on page load
+        loadFAQs();
+    </script>
+</body>
+</html>
