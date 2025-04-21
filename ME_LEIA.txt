@@ -16,3 +16,10 @@ assim instalara todas as bibliotecas nessesarias para rodar o meu codigo.
 Para finalmente rodar o codigo coloque isto no terminal:
 ollama serve
 Depois presse play no app.py
+
+Se tiver mais problemas com as bibliotecas rode este comando
+no mesmo lugar dos outros:
+pip install langchain-ollama langchain-core langchain-community langchain-text-splitters scikit-learn
+
+Se tiver ainda mais problemas PROBLEMA SEU!
+*Brincando
