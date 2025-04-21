@@ -6,3 +6,5 @@ scikit-learn
 numpy
 ollama
 gunicorn==23.0.0
+faiss-cpu
+faiss-gpu
