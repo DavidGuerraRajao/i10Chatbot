@@ -14,7 +14,9 @@ import numpy as np
 app = Flask(__name__)
 
 # Initialize the models and templates
-model = OllamaLLM(model="deepseek-r1:32b")
+modelo = "deepseek-r1:32b"
+
+model = OllamaLLM(model=f"{modelo}")
 
 # Main template (from Main.py)
 main_template = """
@@ -130,7 +132,7 @@ def ask():
             'method': 'FAQ'
         })
     else:
-        embeddings = OllamaEmbeddings(model="qwq:32b")
+        embeddings = OllamaEmbeddings(model=f"{modelo}")
         db = FAISS.load_local(
             DB_DIRECTORY,
             embeddings,
@@ -180,7 +182,7 @@ def add_document():
     splits = text_splitter.split_documents(documents)
 
     # Initialize embeddings
-    embeddings = OllamaEmbeddings(model="deepseek-r1:32b")
+    embeddings = OllamaEmbeddings(model=f"{modelo}")
 
     try:
         # Try to load existing DB
