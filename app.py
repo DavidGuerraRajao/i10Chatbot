@@ -54,7 +54,7 @@ Responda aqui:
 
 # Aonde esta as databases
 PF_DataBase = "PF_DataBase"
-Ai_Manual_DataBase = "Ai_Manual_DataBase"
+Ai_Manual_DataBase = "db_directory"
 
 # Esta funcao serve para filtrar os dados da DataBase da IA Manual
 # mais relevantes em relacao a pergunta
