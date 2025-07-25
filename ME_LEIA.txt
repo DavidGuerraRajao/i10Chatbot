@@ -24,7 +24,7 @@ pip install langchain-ollama langchain-core langchain-community langchain-text-s
 Para mudar de Inteligencia Artificial modefique esta linha:
 modelo =  "deepseek-r1:32b" #Mude deepseek-r1:32b para o seu novo modelo local
 
-Sé aconcer algum problema com algumas das iAs tem um backup, mas para a iA Manual tem que rodar o codigo iA_ManualRunBackUp
+Sé aconcer algum problema com algumas das iAs tem um backup, mas para a iA Manual tem que rodar o codigo RunBackUpDaManual_iA.py
 porque a iA Manual quando roda usa uma database comprimida para acelerar o seu tempo de resposta mas a o backUp não esta 
 comprimido entao este codigo serve para comprimir o backUp devolta para a database da iA Manual
 
