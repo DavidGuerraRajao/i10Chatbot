@@ -1,3 +1,4 @@
+#Importacoes
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
@@ -11,21 +12,21 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
+#Inicialiazando o app local
 app = Flask(__name__)
 
-# Initialize the models and templates
+# Definindo o modelo de IA
 modelo = "deepseek-r1:32b"
-
 model = OllamaLLM(model=f"{modelo}")
 
-# Main template (from Main.py)
-main_template = """
+# Interfaces da IA. É aqui onde a IA é dita oque é para ela vai fazer, como ele vai fazer e o contesto  dos documentos
+iaManual_template = """
 Você é um chatbot chamado David que responde perguntas sobre a Biblioteca virtual, i10 Bibliotecas.
 Aqui estão algumas partes da documentação para te ajudar a responder ao usuario:
-{context}
+{contesto}
 
 Aqui está a pergunta do usuário:
-{question}
+{pergunta}
 
 Tome muito cuidado ao responder o usuário para não alucinar, não falar Português ou falar Inglês.
 Aliás, se o que o usuário perguntou não está na documentação ou dentro do tema responda com preucaucao, mas mesmo assim você deve fornecer alguma resposta sem exceção!
@@ -35,14 +36,13 @@ Mas se voce ter que criar uma resposta mais longa fassa.
 Responda aqui:
 """
 
-# FAQ template (from model2.py)
-faq_template = """
+pf_template = """
 Você é um chatbot chamado David que responde perguntas sobre a Biblioteca virtual, i10 Bibliotecas.
 Aqui estão algumas perguntas e respostas frequentes que tem aver com a pergunta do usuario para te ajudar a responder ao usuario:
-{context}
+{contesto}
 
 Aqui está a pergunta do usuário:
-{question}
+{pergunta}
 
 Tome muito cuidado ao responder o usuário para não alucinar, não falar Português ou falar Inglês.
 Aliás, se o que o usuário perguntou não está na documentação ou dentro do tema responda com preucaucao, mas mesmo assim você deve fornecer alguma resposta sem exceção!
@@ -52,48 +52,52 @@ Mas se voce ter que criar uma resposta mais longa fassa.
 Responda aqui:
 """
 
-# File paths
-FAQ_FILE = "fileij"
-DB_DIRECTORY = "db_directory"
+# Aonde esta as databases
+PF_DataBase = "PF_DataBase"
+Ai_Manual_DataBase = "Ai_Manual_DataBase"
 
+# Esta funcao serve para filtrar os dados da DataBase da IA Manual
+# mais relevantes em relacao a pergunta
+def dados_relevantes(database, pergunta, k=10):
+    return database.similarity_search_with_score(pergunta, k)
 
-def retrieve_docs(db, query, k=10):
-    return db.similarity_search_with_score(query, k)
-
-
-def question_pdf(question, documents):
+# A funcao AiManual serve para organizar os documentos filtrados para
+# o chatbot da AiManual e retornar a resposta dele
+def AiManual(question, documents):
     document_texts = [doc[0].page_content for doc in documents]
     context = "\n\n\n".join(document_texts)
-    prompt = ChatPromptTemplate.from_template(main_template)
+    prompt = ChatPromptTemplate.from_template(iaManual_template)
     chain = prompt | model
-    response = chain.invoke({"question": question, "context": context})
+    response = chain.invoke({"pergunta": question, "contesto": context})
     return re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
 
-
-def load_faq_documents():
-    if os.path.exists(FAQ_FILE):
-        with open(FAQ_FILE, 'r', encoding='utf-8') as f:
+# Nesta parte se organiza e carrega os documentos do modo Perguntas Frequentes
+def load_pf_documents():
+    if os.path.exists(PF_DataBase):
+        with open(PF_DataBase, 'r', encoding='utf-8') as f:
             content = f.read()
         return [line.strip() for line in content.split('//') if line.strip()]
     return []
 
+# Nessa funcao calcula todas as variaveis do Perguntas Frequentes e gera uma resposta
+def PF_response(question):
+    documentos_semilimpos = load_pf_documents()
 
-def get_faq_response(question):
-    dirty_docs = load_faq_documents()
-
-    def cleaner():
-        with open(FAQ_FILE, 'r', encoding='utf-8') as file:
+    def vassora():
+        with open(PF_DataBase, 'r', encoding='utf-8') as file:
             content = file.read()
         pattern = r'Pergunta:\s*(.*?\?)'
         perguntas = re.findall(pattern, content)
         return [pergunta.strip() for pergunta in perguntas]
 
-    cleaned_docs = cleaner()
-    if not cleaned_docs:
+    documentos_limpos = vassora()
+    if not documentos_limpos:
         return "Desculpe, não há perguntas frequentes disponíveis no momento."
 
-    vectorizer = TfidfVectorizer().fit(cleaned_docs)
-    doc_vectors = vectorizer.transform(cleaned_docs)
+    # Vetorizando os documentos limpos e filtrandos
+    # os documentos mais parecidos com a pergunta para o search_docs
+    vectorizer = TfidfVectorizer().fit(documentos_limpos)
+    doc_vectors = vectorizer.transform(documentos_limpos)
     query_vector = vectorizer.transform([question])
     similarities = cosine_similarity(query_vector, doc_vectors).flatten()
     sorted_indices = np.argsort(-similarities)
@@ -103,30 +107,38 @@ def get_faq_response(question):
     for idx in sorted_indices:
         n += 1
         if similarities[idx] < 10.0:
-            search_docs += f'\n\n{dirty_docs[idx]}\n\n\n'
+            search_docs += f'\n\n{documentos_semilimpos[idx]}\n\n\n'
         if n == 8:
             break
 
-    prompt = ChatPromptTemplate.from_template(faq_template)
+    # Enviando todas as variaveis para o chatbot e finalizando por inviar o output fina
+    prompt = ChatPromptTemplate.from_template(pf_template)
     chain = prompt | model
-    response = chain.invoke({"question": question, "context": search_docs})
-    return re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+    resposta = chain.invoke({"pergunta": question, "contesto": search_docs})
+    resposta_filtrada = re.sub(r'<think>.*?</think>', '', resposta, flags=re.DOTALL)
+    return resposta_filtrada
 
 print('Interface dos Admins: http://localhost:5000/admin')
 print('Interface dos Usuarios: http://127.0.0.1:5000')
 
+# Interface "Web" do chatbot:
+
+
+# Interface do Usuario:
+
+# Marcando a file de html
 @app.route('/')
 def home():
     return render_template('index.html')
 
-
+# Funcao de perguntar para o chatbot
 @app.route('/ask', methods=['POST'])
 def ask():
     question = request.form['question']
     use_faq = request.form.get('use_faq', 'true') == 'true'
 
     if use_faq:
-        response = get_faq_response(question)
+        response = PF_response(question)
         return jsonify({
             'response': response,
             'method': 'FAQ'
@@ -134,24 +146,26 @@ def ask():
     else:
         embeddings = OllamaEmbeddings(model=f"{modelo}")
         db = FAISS.load_local(
-            DB_DIRECTORY,
+            Ai_Manual_DataBase,
             embeddings,
             allow_dangerous_deserialization=True
         )
-        related_documents = retrieve_docs(db, question)
-        response = question_pdf(question, related_documents)
+        relevantes = dados_relevantes(db, question)
+        response = AiManual(question, relevantes)
         return jsonify({
             'response': response,
             'method': 'Document Search'
         })
 
 
-# Admin routes
+# Interface do Admin :
+
+#Marcando localizacao do html
 @app.route('/admin')
 def admin():
     return render_template('admin.html')
 
-
+# Interface de onde se adiciona mais PFs
 @app.route('/admin/add_faq', methods=['POST'])
 def add_faq():
     new_entry = request.form['faq_entry']
@@ -161,12 +175,12 @@ def add_faq():
         return jsonify({"success": False, "message": "Formato inválido. Use 'Pergunta: ... Resposta: ...'"})
 
     # Add to FAQ file
-    with open(FAQ_FILE, 'a', encoding='utf-8') as f:
+    with open(PF_DataBase, 'a', encoding='utf-8') as f:
         f.write(f"\n{new_entry}\n//")
 
     return jsonify({"success": True, "message": "FAQ adicionada com sucesso!"})
 
-
+# Interface onde se adiciona mais documentos para a IA Manual
 @app.route('/admin/add_document', methods=['POST'])
 def add_document():
     new_doc = request.form['document_text']
@@ -187,7 +201,7 @@ def add_document():
     try:
         # Try to load existing DB
         db = FAISS.load_local(
-            DB_DIRECTORY,
+            Ai_Manual_DataBase,
             embeddings,
             allow_dangerous_deserialization=True
         )
@@ -197,26 +211,28 @@ def add_document():
         # If DB doesn't exist, create new
         db = FAISS.from_documents(splits, embeddings)
 
+    with open("dbBackUp.txt", "w", encoding='utf-8') as f:
+        f.write(new_doc)
+
     # Save the updated DB
-    db.save_local(DB_DIRECTORY)
+    db.save_local(Ai_Manual_DataBase)
 
     return jsonify({"success": True, "message": "Documento adicionado ao banco de dados com sucesso!"})
 
-
+# Vizualizacao das Perguntas Frequentes
 @app.route('/admin/view_faqs')
 def view_faqs():
-    if os.path.exists(FAQ_FILE):
-        with open(FAQ_FILE, 'r', encoding='utf-8') as f:
+    if os.path.exists(PF_DataBase):
+        with open(PF_DataBase, 'r', encoding='utf-8') as f:
             content = f.read()
         faqs = [faq.strip() for faq in content.split('//') if faq.strip()]
         return jsonify({"faqs": faqs})
     return jsonify({"faqs": []})
 
-
+# Rodar o codigo
 if __name__ == '__main__':
-    # Create necessary files if they don't exist
-    if not os.path.exists(FAQ_FILE):
-        with open(FAQ_FILE, 'w', encoding='utf-8') as f:
+    if not os.path.exists(PF_DataBase):
+        with open(PF_DataBase, 'w', encoding='utf-8') as f:
             f.write("")
 
     app.run(debug=True)
