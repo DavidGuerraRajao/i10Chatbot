@@ -52,7 +52,7 @@ def update_database_from_txt(file_path: str, db_path: str = "db_directory"):
 
 # Example usage:
 if __name__ == "__main__":
-    filepath = "Manual_iADataBase"
+    filepath = "iA_ManualBackUp.txt"
     result = update_database_from_txt(
         file_path=filepath,
         db_path="db_directory"
